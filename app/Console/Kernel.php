@@ -4,6 +4,7 @@ namespace App\Console;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
+//use App\Http\Controllers\MarketController;
 
 class Kernel extends ConsoleKernel
 {
@@ -14,6 +15,8 @@ class Kernel extends ConsoleKernel
      */
     protected $commands = [
         //
+        Commands\MarketRank::class,
+        Commands\InvestorRank::class,
     ];
 
     /**
@@ -26,6 +29,12 @@ class Kernel extends ConsoleKernel
     {
         // $schedule->command('inspire')
         //          ->hourly();
+        //$schedule->call('MarketController@update_market_all_cache')->hourlyAt(10);
+        //$schedule->call('App\Http\Controllers\MarketController@update_market_all_cache')->everyMinute();
+        $schedule->command('marketrank:update all')->hourlyAt(10);
+        $schedule->command('investorrank:update active_shares true')->hourlyAt(5);
+        $schedule->command('investorrank:update new_price')->cron('*/5 * * * * *');
+        $schedule->command('investorrank:update rank')->hourlyAt(15);
     }
 
     /**
@@ -36,5 +45,7 @@ class Kernel extends ConsoleKernel
     protected function commands()
     {
         require base_path('routes/console.php');
+
+
     }
 }

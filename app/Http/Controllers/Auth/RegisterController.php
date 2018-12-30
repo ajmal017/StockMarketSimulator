@@ -2,10 +2,17 @@
 
 namespace App\Http\Controllers\Auth;
 
-use App\User;
+use App\Investor;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Foundation\Auth\RegistersUsers;
+use App\Tools\CacheDrive;
+
+use Session;
+use Cache;
 
 class RegisterController extends Controller
 {
@@ -21,6 +28,7 @@ class RegisterController extends Controller
     */
 
     use RegistersUsers;
+    use CacheDrive;
 
     /**
      * Where to redirect users after registration.
@@ -28,6 +36,11 @@ class RegisterController extends Controller
      * @var string
      */
     protected $redirectTo = '/home';
+
+    protected function redirectTo()
+    {
+        return '/';
+    }
 
     /**
      * Create a new controller instance.
@@ -37,8 +50,54 @@ class RegisterController extends Controller
     public function __construct()
     {
         $this->middleware('guest');
+        $this->middleware('cache');
     }
 
+    public function showRegistrationForm(){
+        return view('auth.register')->withTitle(' | 注册');
+    }   
+
+
+    public function register(Request $request){
+        
+        $v_data = $request->all();
+        $validator = $this->validator($v_data);
+
+
+        if ($validator->fails()){
+            $errors = implode(', ', $validator->errors()->all());
+            Sesssion::flash('failure', $errors);
+            return redirect('auth.register')->withTitle(' | 注册');
+        }
+
+        $investor = new Investor;
+
+        $investor->name = $request->name;
+        $investor->email = $request->email;
+        $investor->password = bcrypt($request->password);
+       
+        $config = $this->getGlobalConfig();
+
+        if (!empty($config) && isset($config['init_credits']))             
+             $investor->coins = intval($config['init_credits']);
+        else
+            $investor->coins = 10000;
+
+        $investor->level = 1; 
+
+        if (!empty($config) && isset($config['default_init_currency']))             
+             $investor->bind_to = $config['default_init_currency'];
+        else
+            $investor->bind_to = 'cny';
+
+        $investor->save();
+
+        Auth::login($investor, true);
+
+        Session::flash('success', '注册成功');
+        return redirect('/')->withTitle('');
+    }
+           
     /**
      * Get a validator for an incoming registration request.
      *
@@ -48,9 +107,9 @@ class RegisterController extends Controller
     protected function validator(array $data)
     {
         return Validator::make($data, [
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
+            'name' => 'required|string|min:5|max:255|unique:investors',
             'password' => 'required|string|min:6|confirmed',
+            'email' => 'required|string|email|max:255',
         ]);
     }
 
@@ -62,10 +121,12 @@ class RegisterController extends Controller
      */
     protected function create(array $data)
     {
-        return User::create([
+        return Investor::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => bcrypt($data['password']),
+            'coins' => 10000, //changable
+            'level' => 1,
         ]);
     }
 }
